@@ -20,12 +20,18 @@
                  "Sat" 7
                  "Sun" 1})
 
-(defn integerize [v]
+(defn integerize
+  "helper function to parse integers from strings and handle special cases
+of substrings that are really number-like representations (for days of week, mostly)"
+  [v]
   (if (integermap v)
     (integermap v)
     (java.lang.Integer/parseInt v)))
 
-  (defn split-or-splat [strfrag]
+(defn split-or-splat
+  "For cron-like strings,  if the value is a splat (which is a *) then don't split
+it on commas. Otherwise, split the field on commas"
+[strfrag]
     (if (= "*" strfrag)
       :splat
       (map integerize
@@ -33,10 +39,10 @@
             clojure.string/trim
             (clojure.string/split strfrag #"\s*,\s*")))))
 
-  (defn schedule-from-string [fstring]
-    (let [tokens (clojure.string/split fstring #"[\s]+")
-          [minutes hours dom mon dow] (map split-or-splat tokens)]
-      (Schedule. minutes hours dom mon dow)))
+(defn schedule-from-string [fstring]
+  (let [tokens (clojure.string/split fstring #"[\s]+")
+        [minutes hours dom mon dow] (map split-or-splat tokens)]
+    (Schedule. minutes hours dom mon dow)))
 
 (defn match-field [field fval sched]
   (or (= :splat (field sched))
@@ -59,12 +65,16 @@
 (defn do-run-func [task]
   ((:runfunction task)))
 
+(defn get-seconds-until-next-minute []
+  (let [ci (Calendar/getInstance)]
+    (* 1000 (- 60 (.get ci (Calendar/SECOND))))))
+
 (defn start-runner []
   (swap! *runner* (fn [v]
                     (if v (future-cancel v))
                     (future (loop []
                               (doall (map do-run-func (get-runable @*taskdb*)))
-                              (Thread/sleep 6000)
+                              (Thread/sleep (get-seconds-until-next-minute))
                               (recur))))))
 
 (defn stop-runner []
