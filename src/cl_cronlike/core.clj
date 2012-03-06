@@ -1,4 +1,6 @@
-(ns cl-cronlike.core)
+(ns cl-cronlike.core
+  (:require clojure.string)
+  (:use clojure.test))
 
 (import 'java.util.Calendar)
 (import 'java.text.SimpleDateFormat)
@@ -18,17 +20,11 @@
                  "Sat" 7
                  "Sun" 1})
 
-(with-test
-  (defn integerize [v]
-    (if (integermap v)
-      (integermap v)
-      (java.lang.Integer/parseInt v)))
-  (is (= 1 (integerize "1")))
-  (is (= 1 (integerize "Sun")))
-  (is (= 17 (integerize "17")))
-  (is (= 3 (integerize "Tue"))))
+(defn integerize [v]
+  (if (integermap v)
+    (integermap v)
+    (java.lang.Integer/parseInt v)))
 
-(with-test
   (defn split-or-splat [strfrag]
     (if (= "*" strfrag)
       :splat
@@ -36,33 +32,27 @@
            (map
             clojure.string/trim
             (clojure.string/split strfrag #"\s*,\s*")))))
-  (is (= :splat (split-or-splat "*")))
-  (is (= [2 3 4] (split-or-splat "Mon, Tue , Wed"))))
 
-(with-test
   (defn schedule-from-string [fstring]
     (let [tokens (clojure.string/split fstring #"[\s]+")
           [minutes hours dom mon dow] (map split-or-splat tokens)]
       (Schedule. minutes hours dom mon dow)))
-  (is (schedule-from-string "* 1,2,3,5 * * * *")))
 
 (defn match-field [field fval sched]
   (or (= :splat (field sched))
       (not (= nil (some (fn [v] (= fval v)) (field sched))))))
 
-(with-test
-  (defn runs-now?
-    ([sched]
-       (runs-now? sched (Calendar/getInstance)))
-    ([sched cal]
-       (let [minmatch (match-field :minute (.get cal (Calendar/MINUTE)) sched)
-             hourmatch (match-field :hour (.get cal (Calendar/HOUR)) sched)
-             dommatch (match-field :dom (.get cal (Calendar/DAY_OF_MONTH)) sched)
-             monmatch (match-field :mon (.get cal (Calendar/MONTH)) sched)
-             dowmatch (match-field :dow (.get cal (Calendar/DAY_OF_WEEK)) sched)]
-         (and hourmatch minmatch dommatch monmatch dowmatch)))))
+(defn runs-now?
+  ([sched]
+     (runs-now? sched (Calendar/getInstance)))
+  ([sched cal]
+     (let [minmatch (match-field :minute (.get cal (Calendar/MINUTE)) sched)
+           hourmatch (match-field :hour (.get cal (Calendar/HOUR)) sched)
+           dommatch (match-field :dom (.get cal (Calendar/DAY_OF_MONTH)) sched)
+           monmatch (match-field :mon (.get cal (Calendar/MONTH)) sched)
+           dowmatch (match-field :dow (.get cal (Calendar/DAY_OF_WEEK)) sched)]
+       (and hourmatch minmatch dommatch monmatch dowmatch))))
 
-                                        ; (schedule-from-string "* * * * 2,3,4,1"))
 (defn get-runable [tasks]
   (filter (fn [r] (runs-now? (:schedule r))) tasks))
 
