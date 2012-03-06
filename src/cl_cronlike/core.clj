@@ -65,7 +65,7 @@ it on commas. Otherwise, split the field on commas"
 (defn do-run-func [task]
   ((:runfunction task)))
 
-(defn get-seconds-until-next-minute []
+(defn get-sleep-until-next-minute []
   (let [ci (Calendar/getInstance)]
     (* 1000 (- 60 (.get ci (Calendar/SECOND))))))
 
@@ -74,7 +74,7 @@ it on commas. Otherwise, split the field on commas"
                     (if v (future-cancel v))
                     (future (loop []
                               (doall (map do-run-func (get-runable @*taskdb*)))
-                              (Thread/sleep (get-seconds-until-next-minute))
+                              (Thread/sleep (get-sleep-until-next-minute))
                               (recur))))))
 
 (defn stop-runner []
