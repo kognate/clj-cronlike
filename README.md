@@ -5,7 +5,10 @@ functions to be called using a Vixie Cron-style schedule string.
 
 ## Usage
 
-   See the docs.
+   You can add `[cl-cronlike "0.0.2"]` do your project file if you are
+   using lien.
+
+   See the docs for more.
 
 ## License
 
