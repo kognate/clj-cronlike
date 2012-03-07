@@ -76,7 +76,7 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
   (filter (fn [r] (runs-now? (:schedule r))) tasks))
 
 (defn ^{:no-doc true} do-run-func [task]
-  ((:runfunction task)))
+  (future ((:runfunction task))))
 
 (defn ^{:no-doc true} get-sleep-until-next-minute []
   (let [ci (Calendar/getInstance)]
@@ -84,7 +84,7 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
 
 (defn running?
   "returns true if the runner is running"
-  []1
+  []
   (not (= nil @*runner*)))
 
 (defn start-runner
@@ -93,8 +93,8 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
   (swap! *runner* (fn [v]
                     (if v (future-cancel v))
                     (future (loop []
-                              (doall (map do-run-func (get-runable @*taskdb*)))
                               (Thread/sleep (get-sleep-until-next-minute))
+                              (doall (map do-run-func (get-runable @*taskdb*)))
                               (recur))))))
 
 (defn stop-runner
