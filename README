@@ -1,13 +1,14 @@
-# cl-cronlike
+# clj-cronlike
 
-FIXME: write description
+clj-cronlike is a clojure library that allows for the scheduling of
+functions to be called using a Vixie Cron-style schedule string.
 
 ## Usage
 
-FIXME: write
+   See the docs.
 
 ## License
 
-Copyright (C) 2012 FIXME
+Copyright (C) 2012 Joshua B. Smith
 
 Distributed under the Eclipse Public License, the same as Clojure.
