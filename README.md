@@ -8,7 +8,7 @@ functions to be called using a Vixie Cron-style schedule string.
    You can add `[cl-cronlike "0.0.2"]` do your project file if you are
    using lien.
 
-   See the docs for more.
+   See the docs for more. http://kognate.github.com/clj-cronlike/doc/
 
 ## License
 
