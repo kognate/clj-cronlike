@@ -9,7 +9,6 @@
 (defrecord ScheduledTask [schedule runfunction])
 
 (def ^{:dynamic true} *taskdb* (atom #{}))
-(def ^{:dynamic true} *shouldrun* (atom true))
 (def ^{:dynamic true} *runner* (atom nil))
 
 (def integermap {"Mon" 2
@@ -39,16 +38,28 @@ it on commas. Otherwise, split the field on commas"
             clojure.string/trim
             (clojure.string/split strfrag #"\s*,\s*")))))
 
-(defn schedule-from-string [fstring]
+(defn schedule-from-string
+  "Takes a string formatted in crontab style and returns a Schedule object.
+Format is:  minutes hours day-of-month month day-of-week.
+Example:  0,15,30,45 12,13,14 * * 2,4,6
+          That format means run every 15 minutes between 12:00 and 15:00 on Monday, Wednesday and Friday
+" [fstring]
   (let [tokens (clojure.string/split fstring #"[\s]+")
         [minutes hours dom mon dow] (map split-or-splat tokens)]
     (Schedule. minutes hours dom mon dow)))
 
-(defn match-field [field fval sched]
+(defn run-function-with-cron
+  [schedulestring functorun]
+  (swap! *taskdb* (fn [v]
+                    (conj v (ScheduledTask. (schedule-from-string schedulestring) functorun)))))
+
+(defn ^{:nodoc true} match-field
+  [field fval sched]
   (or (= :splat (field sched))
       (not (= nil (some (fn [v] (= fval v)) (field sched))))))
 
 (defn runs-now?
+  "Check to see if a given schedule runs at this moment."
   ([sched]
      (runs-now? sched (Calendar/getInstance)))
   ([sched cal]
@@ -59,17 +70,24 @@ it on commas. Otherwise, split the field on commas"
            dowmatch (match-field :dow (.get cal (Calendar/DAY_OF_WEEK)) sched)]
        (and hourmatch minmatch dommatch monmatch dowmatch))))
 
-(defn get-runable [tasks]
+(defn ^{:nodoc true} get-runable [tasks]
   (filter (fn [r] (runs-now? (:schedule r))) tasks))
 
-(defn do-run-func [task]
+(defn ^{:nodoc true} do-run-func [task]
   ((:runfunction task)))
 
-(defn get-sleep-until-next-minute []
+(defn ^{:nodoc true} get-sleep-until-next-minute []
   (let [ci (Calendar/getInstance)]
     (* 1000 (- 60 (.get ci (Calendar/SECOND))))))
 
-(defn start-runner []
+(defn running?
+  "returns true if the runner is running"
+  []
+  (not (= nil @*runner*)))
+
+(defn start-runner
+  "Starts a background thread, running every minute and checking the list of functions"
+  []
   (swap! *runner* (fn [v]
                     (if v (future-cancel v))
                     (future (loop []
@@ -77,7 +95,9 @@ it on commas. Otherwise, split the field on commas"
                               (Thread/sleep (get-sleep-until-next-minute))
                               (recur))))))
 
-(defn stop-runner []
+(defn stop-runner
+  "Stops the loop"
+  []
   (swap! *runner* (fn [v]
                     (if v (future-cancel v))
                     nil)))
