@@ -14,8 +14,8 @@
   (is (= [2 3 4] (split-or-splat "Mon, Tue , Wed"))))
 
 (deftest fromStringTest
-  (is (schedule-from-string "* 1,2,3,5 * * * *"))
-  (is (schedule-from-string "* 1,2,3,5 * * * Mon,Tue,Wed")))
+  (is (schedule-from-string "* 1,2,3,5 * * *"))
+  (is (schedule-from-string "* 1,2,3,5 * * Mon,Tue,Wed")))
 
 (deftest start-stop-runner
   (let [runner (create-runner)]
