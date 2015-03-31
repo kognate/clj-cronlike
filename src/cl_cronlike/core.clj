@@ -46,11 +46,16 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
         [minutes hours dom mon dow] (map split-or-splat tokens)]
     (Schedule. minutes hours dom mon dow)))
 
-(defn run-function-with-cron
+(defn add-function
   "Adds a task to the queue using a cron-style string and a function name"
-  [{:keys [task-db] :as instance} schedulestring functorun]
-  (swap! task-db (fn [v]
-                   (conj v (ScheduledTask. (schedule-from-string schedulestring) functorun)))))
+  [{:keys [task-db] :as instance} schedulestring func-id func]
+  (swap! task-db (fn [db]
+                   (assoc db func-id (ScheduledTask. (schedule-from-string schedulestring) func)))))
+
+(defn remove-function
+  "Removes a function from the queue"
+  [{:keys [task-db] :as instance} func-id]
+  (swap! task-db dissoc func-id))
 
 (defn ^{:no-doc true} match-field
   [field fval sched]
@@ -91,7 +96,7 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
                   (if v (future-cancel v))
                   (future (loop []
                             (Thread/sleep (get-sleep-until-next-minute))
-                            (doall (map do-run-func (get-runable @task-db)))
+                            (doall (map do-run-func (get-runable (vals @task-db))))
                             (recur))))))
 
 (defn stop-runner
@@ -104,4 +109,4 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
 (defn create-runner
   []
   {:runner (atom nil)
-   :task-db (atom #{})})
+   :task-db (atom {})})

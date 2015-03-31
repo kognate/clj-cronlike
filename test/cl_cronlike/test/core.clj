@@ -20,4 +20,6 @@
 (deftest start-stop-runner
   (let [runner (create-runner)]
     (start-runner runner)
+    (add-function runner "* * * * * *" :foo (fn [] nil))
+    (remove-function runner :foo)
     (stop-runner runner)))
