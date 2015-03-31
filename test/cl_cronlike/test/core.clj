@@ -1,6 +1,7 @@
 (ns cl-cronlike.test.core
-  (:use [cl-cronlike.core])
-  (:use [clojure.test]))
+  (:require 
+    [clojure.test :refer :all]
+    [cl-cronlike.core :refer :all]))
 
 (deftest integerizeTest
   (is (= 1 (integerize "1")))
@@ -15,3 +16,8 @@
 (deftest fromStringTest
   (is (schedule-from-string "* 1,2,3,5 * * * *"))
   (is (schedule-from-string "* 1,2,3,5 * * * Mon,Tue,Wed")))
+
+(deftest start-stop-runner
+  (let [runner (create-runner)]
+    (start-runner runner)
+    (stop-runner runner)))

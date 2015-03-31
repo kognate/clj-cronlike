@@ -1,15 +1,12 @@
 (ns cl-cronlike.core
-  (:require clojure.string)
-  (:use clojure.test))
-
-(import 'java.util.Calendar)
-(import 'java.text.SimpleDateFormat)
+  (:require
+    [clojure.string])
+  (:import
+    [java.util Calendar]
+    [java.text SimpleDateFormat]))
 
 (defrecord Schedule [minute hour dom mon dow])
 (defrecord ScheduledTask [schedule runfunction])
-
-(def ^{:dynamic true} *taskdb* (atom #{}))
-(def ^{:dynamic true} *runner* (atom nil))
 
 (def integermap {"Mon" 2
                  "Tue" 3
@@ -51,9 +48,9 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
 
 (defn run-function-with-cron
   "Adds a task to the queue using a cron-style string and a function name"
-  [schedulestring functorun]
-  (swap! *taskdb* (fn [v]
-                    (conj v (ScheduledTask. (schedule-from-string schedulestring) functorun)))))
+  [{:keys [task-db] :as instance} schedulestring functorun]
+  (swap! task-db (fn [v]
+                   (conj v (ScheduledTask. (schedule-from-string schedulestring) functorun)))))
 
 (defn ^{:no-doc true} match-field
   [field fval sched]
@@ -84,22 +81,27 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
 
 (defn running?
   "returns true if the runner is running"
-  []
-  (not (= nil @*runner*)))
+  [{:keys [runner] :as instance}]
+  (not (= nil @runner)))
 
 (defn start-runner
   "Starts a background thread, running every minute and checking the list of functions"
-  []
-  (swap! *runner* (fn [v]
-                    (if v (future-cancel v))
-                    (future (loop []
-                              (Thread/sleep (get-sleep-until-next-minute))
-                              (doall (map do-run-func (get-runable @*taskdb*)))
-                              (recur))))))
+  [{:keys [runner task-db] :as instance}]
+  (swap! runner (fn [v]
+                  (if v (future-cancel v))
+                  (future (loop []
+                            (Thread/sleep (get-sleep-until-next-minute))
+                            (doall (map do-run-func (get-runable @task-db)))
+                            (recur))))))
 
 (defn stop-runner
   "Stops the loop"
+  [{:keys [runner] :as instance}]
+  (swap! runner (fn [v]
+                  (if v (future-cancel v))
+                  nil)))
+
+(defn create-runner
   []
-  (swap! *runner* (fn [v]
-                    (if v (future-cancel v))
-                    nil)))
+  {:runner (atom nil)
+   :task-db (atom #{})})
