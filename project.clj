@@ -1,4 +1,4 @@
-(defproject staples-sparx/cl-cronlike "0.1.0-SNAPSHOT"
+(defproject staples-sparx/cl-cronlike "0.1.0"
   :description "Cron-style scheduler for clojure"
   :dependencies []
   :profiles
