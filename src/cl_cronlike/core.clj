@@ -92,6 +92,17 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
   [{:keys [runner] :as instance}]
   (not (= nil @runner)))
 
+(defn- calendar-factory [acceleration-factor]
+  (if (some? acceleration-factor)
+    (let [start-ts (System/currentTimeMillis)]
+      (fn []
+        (let [cal (Calendar/getInstance)
+              now (.getTimeInMillis cal)
+              sim-ts (+ start-ts (long (* (- now start-ts) acceleration-factor)))]
+          (.setTimeInMillis cal sim-ts)
+          cal)))
+    #(Calendar/getInstance)))
+
 (defn start-runner
   "Starts a background thread, running every minute and checking the list of functions"
   [{:keys [runner task-db time-acceleration] :as instance}]
@@ -110,22 +121,6 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
   (swap! runner (fn [v]
                   (if v (future-cancel v))
                   nil)))
-
-(defn- calendar-factory [acceleration-factor]
-  (if (some? acceleration-factor)
-    (let [start-ts (System/currentTimeMillis)]
-      (fn []
-        (let [cal (Calendar/getInstance)
-              now (.getTimeInMillis cal)
-              sim-ts (+ start-ts (long (* (- now start-ts) acceleration-factor)))]
-          (.setTimeInMillis cal sim-ts)
-          cal)))
-    #(Calendar/getInstance)))
-
-(defn- ms-per-sec [acceleration-factor]
-  (if (some? acceleration-factor)
-    (long (/ 1000 acceleration-factor))
-    1000))
 
 (defn create-runner
   ([] (create-runner {}))
