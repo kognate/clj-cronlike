@@ -23,3 +23,15 @@
     (add-function runner "* * * * * *" :foo (fn [] nil))
     (remove-function runner :foo)
     (stop-runner runner)))
+
+(deftest run-with-accelerated-time
+  (let [runner (create-runner {:time-acceleration 600}) ; 600 minutes in 1 real minute
+        counter (atom 0)
+        increment! (fn [] (swap! counter inc))]
+    (start-runner runner)
+    (add-function runner "* * * * *" :increment increment!)
+    (Thread/sleep 500) ; approx 5 minutes in sim-time
+    (is (<= 3 @counter))
+    (is (<= @counter 7))
+    (remove-function runner :increment)
+    (stop-runner runner)))
