@@ -1,7 +1,9 @@
 (ns cl-cronlike.test.core
   (:require 
     [clojure.test :refer :all]
-    [cl-cronlike.core :refer :all]))
+    [cl-cronlike.core :refer :all])
+  (:import
+    [java.util TimeZone]))
 
 (deftest integerizeTest
   (is (= 1 (integerize "1")))
@@ -25,13 +27,14 @@
     (stop-runner runner)))
 
 (deftest run-with-accelerated-time
-  (let [runner (create-runner {:time-acceleration 600}) ; 600 minutes in 1 real minute
+  (TimeZone/setDefault (TimeZone/getTimeZone "UTC"))
+  (let [runner (create-runner {:time-acceleration 600 ; 600 minutes in 1 real minute
+                               :start-ts 1427875199000}) ; 2015-04-01T07:59:59+00:00}
         counter (atom 0)
         increment! (fn [] (swap! counter inc))]
     (start-runner runner)
-    (add-function runner "* * * * *" :increment increment!)
+    (add-function runner "0,1,2 8 1 4 3" :increment increment!)
     (Thread/sleep 500) ; approx 5 minutes in sim-time
-    (is (<= 3 @counter))
-    (is (<= @counter 7))
+    (is (= 3 @counter))
     (remove-function runner :increment)
     (stop-runner runner)))

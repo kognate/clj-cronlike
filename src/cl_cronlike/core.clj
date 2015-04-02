@@ -68,8 +68,8 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
   (let [minmatch (match-field :minute (.get cal Calendar/MINUTE) sched)
         hourmatch (match-field :hour (.get cal Calendar/HOUR) sched)
         dommatch (match-field :dom (.get cal Calendar/DAY_OF_MONTH) sched)
-        monmatch (match-field :mon (.get cal Calendar/MONTH) sched)
-        dowmatch (match-field :dow (.get cal Calendar/DAY_OF_WEEK) sched)]
+        monmatch (match-field :mon (+ (.get cal Calendar/MONTH) 1) sched)
+        dowmatch (match-field :dow (- (.get cal Calendar/DAY_OF_WEEK) 1) sched)]
     (and hourmatch minmatch dommatch monmatch dowmatch)))
 
 (defn ^{:no-doc true} get-runnable [cal tasks]
@@ -81,7 +81,8 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
 (defn get-sleep-until-next-minute 
   "Returns amount of milliseconds to sleep until the beginnong of the next minute on the calendar"
   [cal acceleration-factor]
-  (let [cur-sec (.get cal Calendar/SECOND)
+  (let [acceleration-factor (or acceleration-factor 1)  
+        cur-sec (.get cal Calendar/SECOND)
         cur-msec (.get cal Calendar/MILLISECOND)
         wait-secs (max (- 59 cur-sec) 0) ; leap second's cur-sec=60
         wait-msecs (+ (* 1000 wait-secs) (- 1000 cur-msec))]
@@ -92,22 +93,24 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
   [{:keys [runner] :as instance}]
   (not (= nil @runner)))
 
-(defn- calendar-factory [acceleration-factor]
-  (if (some? acceleration-factor)
-    (let [start-ts (System/currentTimeMillis)]
+(defn- calendar-factory [acceleration-factor start-ts]
+  (if (or (some? acceleration-factor) (some? start-ts))
+    (let [acceleration-factor (if (some? acceleration-factor) acceleration-factor 1)
+          real-start-ts (System/currentTimeMillis)
+          start-ts (if (some? start-ts) start-ts real-start-ts)]
       (fn []
         (let [cal (Calendar/getInstance)
               now (.getTimeInMillis cal)
-              sim-ts (+ start-ts (long (* (- now start-ts) acceleration-factor)))]
+              sim-ts (+ start-ts (long (* (- now real-start-ts) acceleration-factor)))]
           (.setTimeInMillis cal sim-ts)
+          (println (str cal))
           cal)))
     #(Calendar/getInstance)))
 
 (defn start-runner
   "Starts a background thread, running every minute and checking the list of functions"
-  [{:keys [runner task-db time-acceleration] :as instance}]
-  (let [get-calendar (calendar-factory time-acceleration)
-        time-acceleration (or time-acceleration 1)]
+  [{:keys [runner task-db time-acceleration start-ts] :as instance}]
+  (let [get-calendar (calendar-factory time-acceleration start-ts)]
     (swap! runner (fn [v]
                     (if v (future-cancel v))
                     (future (loop []
@@ -124,9 +127,11 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
 
 (defn create-runner
   ([] (create-runner {}))
-  ([{:keys [time-acceleration]}]
+  ([{:keys [time-acceleration start-ts]}]
    "Options are
-    :time-acceleration float or nil : simulate accelerated time by a factor of n"
+    :time-acceleration float or nil : simulate accelerated time by a factor of n
+    :start-ts simulated start time (unix timestamp in ms)"
   {:runner (atom nil)
    :task-db (atom {})
-   :time-acceleration time-acceleration}))
+   :time-acceleration time-acceleration
+   :start-ts start-ts}))
