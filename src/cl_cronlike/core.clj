@@ -103,7 +103,6 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
               now (.getTimeInMillis cal)
               sim-ts (+ start-ts (long (* (- now real-start-ts) acceleration-factor)))]
           (.setTimeInMillis cal sim-ts)
-          (println (str cal))
           cal)))
     #(Calendar/getInstance)))
 
