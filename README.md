@@ -5,8 +5,22 @@ functions to be called using a Vixie Cron-style schedule string.
 
 ## Usage
 
-   You can add `[cl-cronlike "0.0.2"]` do your project file if you are
+   Add `[cl-cronlike "0.1.7"]` to your project file if you are
    using lien.
+```clojure
+(ns foo
+  (:require [cl-cronlike.core :as cron]))
+  
+(defn hello! []
+  (println "Hello world!" (System/currentTimeMillis)))
+  
+(let [runner (cron/create-runner)]
+  (cron/start-runner runner)
+  (cron/add-function runner "0,15,30,45 * * * *" :hello hello!)
+  ...
+  (cron/remove-function runner :hello)
+  (cron/stop-runner runner))
+```
 
    See the docs for more. http://kognate.github.com/clj-cronlike/doc/
 

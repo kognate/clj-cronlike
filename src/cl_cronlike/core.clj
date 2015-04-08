@@ -1,15 +1,12 @@
 (ns cl-cronlike.core
-  (:require clojure.string)
-  (:use clojure.test))
-
-(import 'java.util.Calendar)
-(import 'java.text.SimpleDateFormat)
+  (:require
+    [clojure.string])
+  (:import
+    [java.util Calendar]
+    [java.text SimpleDateFormat]))
 
 (defrecord Schedule [minute hour dom mon dow])
 (defrecord ScheduledTask [schedule runfunction])
-
-(def ^{:dynamic true} *taskdb* (atom #{}))
-(def ^{:dynamic true} *runner* (atom nil))
 
 (def integermap {"Mon" 2
                  "Tue" 3
@@ -47,59 +44,93 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
 " [schedulestring]
   (let [tokens (clojure.string/split schedulestring #"[\s]+")
         [minutes hours dom mon dow] (map split-or-splat tokens)]
-    (Schedule. minutes hours dom mon dow)))
+    (->Schedule minutes hours dom mon dow)))
 
-(defn run-function-with-cron
+(defn add-function
   "Adds a task to the queue using a cron-style string and a function name"
-  [schedulestring functorun]
-  (swap! *taskdb* (fn [v]
-                    (conj v (ScheduledTask. (schedule-from-string schedulestring) functorun)))))
+  [{:keys [task-db] :as instance} schedulestring func-id func]
+  (swap! task-db (fn [db]
+                   (assoc db func-id (->ScheduledTask (schedule-from-string schedulestring) func)))))
+
+(defn remove-function
+  "Removes a function from the queue"
+  [{:keys [task-db] :as instance} func-id]
+  (swap! task-db dissoc func-id))
 
 (defn ^{:no-doc true} match-field
   [field fval sched]
   (or (= :splat (field sched))
       (not (= nil (some (fn [v] (= fval v)) (field sched))))))
 
-(defn ^{:no-doc true} runs-now?
+(defn runs-now?
   "Check to see if a given schedule runs at this moment."
-  ([sched]
-     (runs-now? sched (Calendar/getInstance)))
-  ([sched cal]
-     (let [minmatch (match-field :minute (.get cal (Calendar/MINUTE)) sched)
-           hourmatch (match-field :hour (.get cal (Calendar/HOUR)) sched)
-           dommatch (match-field :dom (.get cal (Calendar/DAY_OF_MONTH)) sched)
-           monmatch (match-field :mon (.get cal (Calendar/MONTH)) sched)
-           dowmatch (match-field :dow (.get cal (Calendar/DAY_OF_WEEK)) sched)]
-       (and hourmatch minmatch dommatch monmatch dowmatch))))
+  [sched cal]
+  (let [minmatch (match-field :minute (.get cal Calendar/MINUTE) sched)
+        hourmatch (match-field :hour (.get cal Calendar/HOUR_OF_DAY) sched)
+        dommatch (match-field :dom (.get cal Calendar/DAY_OF_MONTH) sched)
+        monmatch (match-field :mon (+ (.get cal Calendar/MONTH) 1) sched)
+        dowmatch (match-field :dow (- (.get cal Calendar/DAY_OF_WEEK) 1) sched)]
+    (and hourmatch minmatch dommatch monmatch dowmatch)))
 
-(defn ^{:no-doc true} get-runable [tasks]
-  (filter (fn [r] (runs-now? (:schedule r))) tasks))
+(defn ^{:no-doc true} get-runnable [cal tasks]
+  (filter (fn [r] (runs-now? (:schedule r) cal)) tasks))
 
 (defn ^{:no-doc true} do-run-func [task]
   (future ((:runfunction task))))
 
-(defn ^{:no-doc true} get-sleep-until-next-minute []
-  (let [ci (Calendar/getInstance)]
-    (* 1000 (- 60 (.get ci (Calendar/SECOND))))))
+(defn get-sleep-until-next-minute 
+  "Returns amount of milliseconds to sleep until the beginnong of the next minute on the calendar"
+  [cal acceleration-factor]
+  (let [acceleration-factor (or acceleration-factor 1)  
+        cur-sec (.get cal Calendar/SECOND)
+        cur-msec (.get cal Calendar/MILLISECOND)
+        wait-secs (max (- 59 cur-sec) 0) ; leap second's cur-sec=60
+        wait-msecs (+ (* 1000 wait-secs) (- 1000 cur-msec))]
+    (long (/ wait-msecs acceleration-factor))))
 
 (defn running?
-  "returns true if the runner is running"
-  []
-  (not (= nil @*runner*)))
+  "Returns true if the runner is running"
+  [{:keys [runner] :as instance}]
+  (not (= nil @runner)))
+
+(defn- calendar-factory [acceleration-factor start-ts]
+  (if (or (some? acceleration-factor) (some? start-ts))
+    (let [acceleration-factor (if (some? acceleration-factor) acceleration-factor 1)
+          real-start-ts (System/currentTimeMillis)
+          start-ts (if (some? start-ts) start-ts real-start-ts)]
+      (fn []
+        (let [cal (Calendar/getInstance)
+              now (.getTimeInMillis cal)
+              sim-ts (+ start-ts (long (* (- now real-start-ts) acceleration-factor)))]
+          (.setTimeInMillis cal sim-ts)
+          cal)))
+    #(Calendar/getInstance)))
 
 (defn start-runner
   "Starts a background thread, running every minute and checking the list of functions"
-  []
-  (swap! *runner* (fn [v]
+  [{:keys [runner task-db time-acceleration start-ts] :as instance}]
+  (let [get-calendar (calendar-factory time-acceleration start-ts)]
+    (swap! runner (fn [v]
                     (if v (future-cancel v))
                     (future (loop []
-                              (Thread/sleep (get-sleep-until-next-minute))
-                              (doall (map do-run-func (get-runable @*taskdb*)))
-                              (recur))))))
+                              (Thread/sleep (get-sleep-until-next-minute (get-calendar) time-acceleration))
+                              (doall (map do-run-func (get-runnable (get-calendar) (vals @task-db))))
+                              (recur)))))))
 
 (defn stop-runner
   "Stops the loop"
-  []
-  (swap! *runner* (fn [v]
-                    (if v (future-cancel v))
-                    nil)))
+  [{:keys [runner] :as instance}]
+  (swap! runner (fn [v]
+                  (if v (future-cancel v))
+                  nil)))
+
+(defn create-runner
+  ([] (create-runner {}))
+  ([{:keys [time-acceleration start-ts]}]
+   "Options are
+    :time-acceleration float or nil : simulate accelerated time by a factor of n
+    :start-ts simulated start time (unix timestamp in ms)"
+  {:runner (atom nil)
+   :task-db (atom {})
+   :time-acceleration time-acceleration
+   :start-ts start-ts}))
