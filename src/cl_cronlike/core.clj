@@ -66,7 +66,7 @@ NOTE: each set of comma-seperated values MUST NOT have spaces
   "Check to see if a given schedule runs at this moment."
   [sched cal]
   (let [minmatch (match-field :minute (.get cal Calendar/MINUTE) sched)
-        hourmatch (match-field :hour (.get cal Calendar/HOUR) sched)
+        hourmatch (match-field :hour (.get cal Calendar/HOUR_OF_DAY) sched)
         dommatch (match-field :dom (.get cal Calendar/DAY_OF_MONTH) sched)
         monmatch (match-field :mon (+ (.get cal Calendar/MONTH) 1) sched)
         dowmatch (match-field :dow (- (.get cal Calendar/DAY_OF_WEEK) 1) sched)]
