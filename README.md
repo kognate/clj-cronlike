@@ -26,6 +26,6 @@ functions to be called using a Vixie Cron-style schedule string.
 
 ## License
 
-Copyright (C) 2012 Joshua B. Smith
+Copyright (C) 2012 - 2015 Joshua B. Smith
 
 Distributed under the Eclipse Public License, the same as Clojure.
